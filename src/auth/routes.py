@@ -30,10 +30,16 @@ async def google_sign_in(
 ):
     """Authenticate user with Google Sign-In ID token"""
     try:
+        # Log the client ID being used (first/last 4 chars only for security)
+        client_id = settings.GOOGLE_CLIENT_ID
+        print(f"Using Google Client ID: {client_id[:4]}...{client_id[-4:]}")
+
         # Verify Google ID token
         idinfo = id_token.verify_oauth2_token(
             request.id_token, requests.Request(), settings.GOOGLE_CLIENT_ID
         )
+
+        print(f"Token verified successfully for user: {idinfo.get('email')}")
 
         if idinfo["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
             raise HTTPException(
@@ -52,6 +58,7 @@ async def google_sign_in(
 
         if user_response.data:
             user = user_response.data[0]
+            print(f"Existing user found: {user['username']}")
         else:
             # Create new user
             username = email.split("@")[0] + "_" + google_id[:8]
@@ -73,6 +80,7 @@ async def google_sign_in(
                 )
 
             user = user_response.data[0]
+            print(f"New user created: {user['username']}")
 
         # Create JWT token
         access_token = create_access_token(data={"sub": str(user["id"])})
@@ -80,11 +88,18 @@ async def google_sign_in(
         return AuthResponse(access_token=access_token, token_type="bearer", user=user)
 
     except ValueError as e:
+        print(f"Token verification failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid ID token: {str(e)}",
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Unexpected error during authentication: {str(e)}")
+        import traceback
+
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Authentication failed: {str(e)}",
