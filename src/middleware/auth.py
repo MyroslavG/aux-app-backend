@@ -76,7 +76,11 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return response.data
+    user_data = response.data
+    # Derive spotify_connected from whether spotify_access_token exists
+    user_data["spotify_connected"] = bool(user_data.get("spotify_access_token"))
+
+    return user_data
 
 
 async def get_optional_current_user(
