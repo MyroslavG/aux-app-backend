@@ -41,8 +41,10 @@ def get_user_spotify_client(user: dict) -> spotipy.Spotify:
     # Check if token is expired
     expires_at = user.get("spotify_token_expires_at")
     if expires_at:
+        from datetime import timezone
         expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-        if expires_at <= datetime.utcnow():
+        now = datetime.now(timezone.utc)
+        if expires_at <= now:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Spotify token expired, please reconnect",
@@ -114,7 +116,8 @@ async def spotify_callback(
         )
 
     # Calculate token expiration
-    expires_at = datetime.utcnow() + timedelta(seconds=token_info["expires_in"])
+    from datetime import timezone
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_info["expires_in"])
 
     # Update user with Spotify tokens using state (user_id)
     update_data = {
