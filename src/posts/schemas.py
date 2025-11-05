@@ -37,14 +37,14 @@ class CommentUser(BaseModel):
     id: str
     username: str
     display_name: str
-    avatar_url: Optional[str] = None
+    profile_image_url: Optional[str] = None
 
 
 class PostAuthor(BaseModel):
     id: str
     username: str
     display_name: str
-    avatar_url: Optional[str] = None
+    profile_image_url: Optional[str] = None
 
 
 class PostResponse(BaseModel):

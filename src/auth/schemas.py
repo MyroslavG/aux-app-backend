@@ -19,7 +19,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     username: str
     display_name: str
-    avatar_url: Optional[str] = None
+    profile_image_url: Optional[str] = None
     bio: Optional[str] = None
     spotify_connected: bool = False
     created_at: datetime

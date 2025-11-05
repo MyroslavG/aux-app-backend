@@ -7,14 +7,14 @@ from pydantic import BaseModel, Field
 class UserProfileUpdate(BaseModel):
     display_name: Optional[str] = Field(None, min_length=1, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
-    avatar_url: Optional[str] = None
+    profile_image_url: Optional[str] = None
 
 
 class UserProfile(BaseModel):
     id: str
     username: str
     display_name: str
-    avatar_url: Optional[str] = None
+    profile_image_url: Optional[str] = None
     bio: Optional[str] = None
     spotify_connected: bool = False
     followers_count: int = 0
@@ -36,7 +36,7 @@ class UserSearchResult(BaseModel):
     id: str
     username: str
     display_name: str
-    avatar_url: Optional[str] = None
+    profile_image_url: Optional[str] = None
     is_following: bool = False
 
     class Config:

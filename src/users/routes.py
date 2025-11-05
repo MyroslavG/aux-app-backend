@@ -76,7 +76,7 @@ async def search_users(
     # Search users
     users = (
         supabase.table("users")
-        .select("id, username, display_name, avatar_url")
+        .select("id, username, display_name, profile_image_url")
         .or_(f"username.ilike.{search_query},display_name.ilike.{search_query}")
         .limit(limit)
         .execute()
@@ -108,7 +108,7 @@ async def get_user_profile(
     user = (
         supabase.table("users")
         .select(
-            "id, username, display_name, avatar_url, bio, spotify_connected, created_at"
+            "id, username, display_name, profile_image_url, bio, spotify_connected, created_at"
         )
         .eq("username", username)
         .single()
@@ -289,7 +289,7 @@ async def get_followers(
     # Get followers with user info
     followers = (
         supabase.table("follows")
-        .select("follower:follower_id(id, username, display_name, avatar_url)")
+        .select("follower:follower_id(id, username, display_name, profile_image_url)")
         .eq("following_id", user.data["id"])
         .range(offset, offset + limit - 1)
         .execute()
@@ -333,7 +333,7 @@ async def get_following(
     # Get following with user info
     following = (
         supabase.table("follows")
-        .select("following:following_id(id, username, display_name, avatar_url)")
+        .select("following:following_id(id, username, display_name, profile_image_url)")
         .eq("follower_id", user.data["id"])
         .range(offset, offset + limit - 1)
         .execute()

@@ -19,7 +19,7 @@ def format_post_with_user(post: dict, supabase: Client) -> PostResponse:
     # Get user info
     user = (
         supabase.table("users")
-        .select("id, username, display_name, avatar_url")
+        .select("id, username, display_name, profile_image_url")
         .eq("id", post["user_id"])
         .single()
         .execute()
