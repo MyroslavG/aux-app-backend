@@ -129,9 +129,32 @@ async def spotify_callback(
     return HTMLResponse(
         content="""
         <html>
-            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-                <h1 style="color: #1DB954;">✓ Spotify Connected Successfully!</h1>
-                <p>You can close this window and return to the app.</p>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                        text-align: center;
+                        padding: 50px 20px;
+                        background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
+                        margin: 0;
+                        min-height: 100vh;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;">
+                <div style="background: white;
+                           padding: 40px;
+                           border-radius: 20px;
+                           box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                           max-width: 400px;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">✓</div>
+                    <h1 style="color: #1DB954; margin: 0 0 10px 0; font-size: 24px;">Spotify Connected!</h1>
+                    <p style="color: #666; margin: 0 0 30px 0; font-size: 16px;">
+                        Your Spotify account has been successfully connected.
+                    </p>
+                    <p style="color: #999; font-size: 14px; margin: 0;">
+                        You can close this window and return to the AUX app.
+                    </p>
+                </div>
                 <script>
                     // Try to close the window after 2 seconds
                     setTimeout(() => {
