@@ -34,7 +34,7 @@ def get_spotify_oauth() -> SpotifyOAuth:
 
 def get_user_spotify_client(user: dict) -> spotipy.Spotify:
     """Get Spotify client for a user with valid tokens."""
-    if not user.get("spotify_connected"):
+    if not user.get("spotify_access_token"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Spotify not connected"
         )
@@ -99,8 +99,6 @@ async def spotify_callback(
 
     # Update user with Spotify tokens
     update_data = {
-        "spotify_connected": True,
-        "spotify_user_id": spotify_user["id"],
         "spotify_access_token": token_info["access_token"],
         "spotify_refresh_token": token_info["refresh_token"],
         "spotify_token_expires_at": expires_at.isoformat(),
@@ -108,7 +106,7 @@ async def spotify_callback(
 
     supabase.table("users").update(update_data).eq("id", current_user["id"]).execute()
 
-    return SpotifyConnectionStatus(connected=True, spotify_user_id=spotify_user["id"])
+    return SpotifyConnectionStatus(connected=True)
 
 
 @router.delete("/disconnect", response_model=SpotifyConnectionStatus)
@@ -118,8 +116,6 @@ async def disconnect_spotify(
 ):
     """Disconnect Spotify account."""
     update_data = {
-        "spotify_connected": False,
-        "spotify_user_id": None,
         "spotify_access_token": None,
         "spotify_refresh_token": None,
         "spotify_token_expires_at": None,
@@ -134,8 +130,7 @@ async def disconnect_spotify(
 async def get_spotify_status(current_user: dict = Depends(get_current_user)):
     """Get Spotify connection status."""
     return SpotifyConnectionStatus(
-        connected=current_user.get("spotify_connected", False),
-        spotify_user_id=current_user.get("spotify_user_id"),
+        connected=bool(current_user.get("spotify_access_token"))
     )
 
 

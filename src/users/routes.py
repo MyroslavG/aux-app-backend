@@ -108,7 +108,7 @@ async def get_user_profile(
     user = (
         supabase.table("users")
         .select(
-            "id, username, display_name, profile_image_url, bio, spotify_connected, created_at"
+            "id, username, display_name, profile_image_url, bio, spotify_access_token, created_at"
         )
         .eq("username", username)
         .single()
@@ -121,6 +121,11 @@ async def get_user_profile(
         )
 
     user_data = user.data
+    # Derive spotify_connected from whether spotify_access_token exists
+    user_data["spotify_connected"] = bool(user_data.get("spotify_access_token"))
+    # Remove the token from response for security
+    user_data.pop("spotify_access_token", None)
+
     stats = get_user_stats(user_data["id"], supabase)
 
     # Check if current user is following this user
