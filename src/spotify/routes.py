@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 import spotipy
@@ -41,7 +41,6 @@ def get_user_spotify_client(user: dict) -> spotipy.Spotify:
     # Check if token is expired
     expires_at = user.get("spotify_token_expires_at")
     if expires_at:
-        from datetime import timezone
         expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
         if expires_at <= now:
@@ -115,9 +114,9 @@ async def spotify_callback(
             status_code=500,
         )
 
-    # Calculate token expiration
-    from datetime import timezone
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_info["expires_in"])
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        seconds=token_info["expires_in"]
+    )
 
     # Update user with Spotify tokens using state (user_id)
     update_data = {
@@ -218,9 +217,12 @@ async def search_tracks(
 
     tracks = []
     for item in results["tracks"]["items"]:
-        # Join multiple artists with ", " for frontend display
         artists_list = item.get("artists", [])
-        artist_str = ", ".join([artist["name"] for artist in artists_list]) if artists_list else ""
+        artist_str = (
+            ", ".join([artist["name"] for artist in artists_list])
+            if artists_list
+            else ""
+        )
 
         track = SpotifyTrack(
             id=item.get("id", ""),
@@ -258,9 +260,10 @@ async def get_track(track_id: str, current_user: dict = Depends(get_current_user
             status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
         )
 
-    # Join multiple artists with ", " for frontend display
     artists_list = item.get("artists", [])
-    artist_str = ", ".join([artist["name"] for artist in artists_list]) if artists_list else ""
+    artist_str = (
+        ", ".join([artist["name"] for artist in artists_list]) if artists_list else ""
+    )
 
     return SpotifyTrack(
         id=item["id"],
@@ -302,7 +305,9 @@ async def get_user_playlists(
             id=item["id"],
             name=item["name"],
             description=item.get("description"),
-            image=item.get("images", [{}])[0].get("url") if item.get("images") else None,
+            image=(
+                item.get("images", [{}])[0].get("url") if item.get("images") else None
+            ),
             tracks_total=item.get("tracks", {}).get("total", 0),
         )
         playlists.append(playlist)
@@ -330,12 +335,17 @@ async def get_currently_playing(current_user: dict = Depends(get_current_user)):
     if not item:
         return CurrentlyPlaying(is_playing=False)
 
+    artists_list = item.get("artists", [])
+    artist_str = (
+        ", ".join([artist["name"] for artist in artists_list]) if artists_list else ""
+    )
+
     track = SpotifyTrack(
         id=item.get("id", ""),
         name=item.get("name", ""),
-        artists=[artist["name"] for artist in item.get("artists", [])],
+        artist=artist_str,
         album=item.get("album", {}).get("name", ""),
-        album_art=(
+        album_art_url=(
             item.get("album", {}).get("images", [{}])[0].get("url")
             if item.get("album", {}).get("images")
             else None
@@ -379,12 +389,19 @@ async def get_top_tracks(
 
     tracks = []
     for item in results["items"]:
+        artists_list = item.get("artists", [])
+        artist_str = (
+            ", ".join([artist["name"] for artist in artists_list])
+            if artists_list
+            else ""
+        )
+
         track = SpotifyTrack(
             id=item.get("id", ""),
             name=item.get("name", ""),
-            artists=[artist["name"] for artist in item.get("artists", [])],
+            artist=artist_str,
             album=item.get("album", {}).get("name", ""),
-            album_art=(
+            album_art_url=(
                 item.get("album", {}).get("images", [{}])[0].get("url")
                 if item.get("album", {}).get("images")
                 else None
