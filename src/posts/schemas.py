@@ -53,15 +53,11 @@ class PostResponse(BaseModel):
     spotify_track_id: str
     track_name: str
     artist_name: str
-    album_name: Optional[str] = None
     album_art_url: Optional[str] = None
     caption: Optional[str] = None
-    likes_count: int
-    comments_count: int
     created_at: datetime
     updated_at: datetime
     user: PostAuthor
-    is_liked: bool = False
 
     class Config:
         from_attributes = True

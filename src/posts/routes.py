@@ -25,7 +25,21 @@ def format_post_with_user(post: dict, supabase: Client) -> PostResponse:
         .execute()
     )
 
-    return PostResponse(**post, user=PostAuthor(**user.data))
+    # Map database column names to response field names
+    formatted_post = {
+        "id": post["id"],
+        "user_id": post["user_id"],
+        "spotify_track_id": post["spotify_track_id"],
+        "track_name": post["spotify_track_name"],
+        "artist_name": post["spotify_artist_name"],
+        "album_art_url": post.get("spotify_album_art_url"),
+        "caption": post.get("caption"),
+        "created_at": post["created_at"],
+        "updated_at": post["updated_at"],
+        "user": PostAuthor(**user.data),
+    }
+
+    return PostResponse(**formatted_post)
 
 
 @router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
@@ -35,7 +49,15 @@ async def create_post(
     supabase: Client = Depends(get_supabase_client),
 ):
     """Create a new post with a Spotify track."""
-    new_post = {"user_id": current_user["id"], **post_data.model_dump()}
+    # Map CreatePostRequest fields to database column names
+    new_post = {
+        "user_id": current_user["id"],
+        "spotify_track_id": post_data.spotify_track_id,
+        "spotify_track_name": post_data.track_name,
+        "spotify_artist_name": post_data.artist_name,
+        "spotify_album_art_url": post_data.album_art_url,
+        "caption": post_data.caption,
+    }
 
     result = supabase.table("posts").insert(new_post).execute()
 
