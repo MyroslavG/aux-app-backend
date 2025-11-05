@@ -59,28 +59,40 @@ def get_user_spotify_client(user: dict) -> spotipy.Spotify:
 
 @router.get("/connect", response_model=SpotifyAuthResponse)
 async def connect_spotify(current_user: dict = Depends(get_current_user)):
-    """Get Spotify authorization URL."""
+    """Get Spotify authorization URL with user state."""
     sp_oauth = get_spotify_oauth()
-    auth_url = sp_oauth.get_authorize_url()
+    # Use user ID as state parameter to identify the user after callback
+    state = current_user["id"]
+    auth_url = sp_oauth.get_authorize_url(state=state)
 
     return SpotifyAuthResponse(auth_url=auth_url)
 
 
-@router.get("/callback", response_model=SpotifyConnectionStatus)
+@router.get("/callback")
 async def spotify_callback(
     code: str,
-    current_user: dict = Depends(get_current_user),
+    state: str,
     supabase: Client = Depends(get_supabase_client),
 ):
     """Handle Spotify OAuth callback and save tokens."""
+    from fastapi.responses import HTMLResponse
+
     sp_oauth = get_spotify_oauth()
 
     try:
         token_info = sp_oauth.get_access_token(code, check_cache=False)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to get access token: {str(e)}",
+        return HTMLResponse(
+            content=f"""
+            <html>
+                <body>
+                    <h1>Spotify Connection Failed</h1>
+                    <p>Error: {str(e)}</p>
+                    <p>You can close this window.</p>
+                </body>
+            </html>
+            """,
+            status_code=400,
         )
 
     # Get Spotify user info
@@ -88,24 +100,49 @@ async def spotify_callback(
     spotify_user = sp.current_user()
 
     if not spotify_user or "id" not in spotify_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get Spotify user info",
+        return HTMLResponse(
+            content="""
+            <html>
+                <body>
+                    <h1>Spotify Connection Failed</h1>
+                    <p>Failed to get Spotify user info</p>
+                    <p>You can close this window.</p>
+                </body>
+            </html>
+            """,
+            status_code=500,
         )
 
     # Calculate token expiration
     expires_at = datetime.utcnow() + timedelta(seconds=token_info["expires_in"])
 
-    # Update user with Spotify tokens
+    # Update user with Spotify tokens using state (user_id)
     update_data = {
         "spotify_access_token": token_info["access_token"],
         "spotify_refresh_token": token_info["refresh_token"],
         "spotify_token_expires_at": expires_at.isoformat(),
     }
 
-    supabase.table("users").update(update_data).eq("id", current_user["id"]).execute()
+    supabase.table("users").update(update_data).eq("id", state).execute()
 
-    return SpotifyConnectionStatus(connected=True)
+    # Return success page
+    return HTMLResponse(
+        content="""
+        <html>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #1DB954;">✓ Spotify Connected Successfully!</h1>
+                <p>You can close this window and return to the app.</p>
+                <script>
+                    // Try to close the window after 2 seconds
+                    setTimeout(() => {
+                        window.close();
+                    }, 2000);
+                </script>
+            </body>
+        </html>
+        """,
+        status_code=200,
+    )
 
 
 @router.delete("/disconnect", response_model=SpotifyConnectionStatus)
