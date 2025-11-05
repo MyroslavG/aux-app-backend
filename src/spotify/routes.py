@@ -12,7 +12,6 @@ from src.middleware import get_current_user, get_supabase_client
 from .schemas import (
     CurrentlyPlaying,
     SpotifyAuthResponse,
-    SpotifyCallbackRequest,
     SpotifyConnectionStatus,
     SpotifyPlaylist,
     SpotifySearchResponse,
@@ -67,9 +66,9 @@ async def connect_spotify(current_user: dict = Depends(get_current_user)):
     return SpotifyAuthResponse(auth_url=auth_url)
 
 
-@router.post("/callback", response_model=SpotifyConnectionStatus)
+@router.get("/callback", response_model=SpotifyConnectionStatus)
 async def spotify_callback(
-    callback_data: SpotifyCallbackRequest,
+    code: str,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client),
 ):
@@ -77,7 +76,7 @@ async def spotify_callback(
     sp_oauth = get_spotify_oauth()
 
     try:
-        token_info = sp_oauth.get_access_token(callback_data.code, check_cache=False)
+        token_info = sp_oauth.get_access_token(code, check_cache=False)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
