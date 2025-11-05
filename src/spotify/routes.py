@@ -218,12 +218,16 @@ async def search_tracks(
 
     tracks = []
     for item in results["tracks"]["items"]:
+        # Join multiple artists with ", " for frontend display
+        artists_list = item.get("artists", [])
+        artist_str = ", ".join([artist["name"] for artist in artists_list]) if artists_list else ""
+
         track = SpotifyTrack(
             id=item.get("id", ""),
             name=item.get("name", ""),
-            artists=[artist["name"] for artist in item.get("artists", [])],
+            artist=artist_str,  # Changed from artists list to single string
             album=item.get("album", {}).get("name", ""),
-            album_art=(
+            album_art_url=(  # Changed from album_art to album_art_url
                 item.get("album", {}).get("images", [{}])[0].get("url")
                 if item.get("album", {}).get("images")
                 else None
@@ -254,12 +258,16 @@ async def get_track(track_id: str, current_user: dict = Depends(get_current_user
             status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
         )
 
+    # Join multiple artists with ", " for frontend display
+    artists_list = item.get("artists", [])
+    artist_str = ", ".join([artist["name"] for artist in artists_list]) if artists_list else ""
+
     return SpotifyTrack(
         id=item["id"],
         name=item["name"],
-        artists=[artist["name"] for artist in item.get("artists", [])],
+        artist=artist_str,  # Changed from artists list to single string
         album=item.get("album", {}).get("name", ""),
-        album_art=(
+        album_art_url=(  # Changed from album_art to album_art_url
             item.get("album", {}).get("images", [{}])[0].get("url")
             if item.get("album", {}).get("images")
             else None
