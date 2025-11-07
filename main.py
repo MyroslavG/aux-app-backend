@@ -9,6 +9,7 @@ from config.settings import settings
 # Import routers
 from src.auth import router as auth_router
 from src.middleware.error_handler import general_exception_handler
+from src.notifications import router as notifications_router
 from src.posts import router as posts_router
 from src.spotify import router as spotify_router
 from src.storage import router as storage_router
@@ -55,6 +56,7 @@ app.include_router(users_router, prefix=settings.API_V1_PREFIX)
 app.include_router(posts_router, prefix=settings.API_V1_PREFIX)
 app.include_router(spotify_router, prefix=settings.API_V1_PREFIX)
 app.include_router(storage_router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

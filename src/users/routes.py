@@ -216,6 +216,22 @@ async def follow_user(
         {"follower_id": current_user["id"], "following_id": target_user_id}
     ).execute()
 
+    # Create notification for the followed user
+    supabase.table("notifications").insert(
+        {
+            "user_id": target_user_id,
+            "type": "follow",
+            "title": "New Follower",
+            "body": f"{current_user['username']} started following you",
+            "data": {
+                "follower_id": current_user["id"],
+                "follower_username": current_user["username"],
+                "follower_display_name": current_user.get("display_name", current_user["username"]),
+                "follower_profile_image_url": current_user.get("profile_image_url"),
+            },
+        }
+    ).execute()
+
     # Get updated followers count
     followers = (
         supabase.table("follows")
