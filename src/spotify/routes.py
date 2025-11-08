@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import spotipy
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from spotipy.oauth2 import SpotifyOAuth
 from supabase._sync.client import SyncClient as Client
 
@@ -115,9 +116,48 @@ async def spotify_callback(
     try:
         token_info = sp_oauth.get_access_token(code, check_cache=False)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to get access token: {str(e)}",
+        return HTMLResponse(
+            content=f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta charset="UTF-8">
+                <title>Connection Failed</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; text-align: center; margin: 20px;">
+                    <div style="width: 80px; height: 80px; background: #fee; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">❌</div>
+                    <h1 style="color: #333; margin: 0 0 15px 0; font-size: 24px; font-weight: 600;">Connection Failed</h1>
+                    <p style="color: #666; margin: 0 0 25px 0; font-size: 16px; line-height: 1.5;">Unable to connect your Spotify account. Please try again.</p>
+                    <p style="color: #999; font-size: 14px; margin: 0; padding: 15px; background: #f8f9fa; border-radius: 10px;">Error: {str(e)}</p>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=400,
+        )
+
+    if not token_info or "access_token" not in token_info:
+        return HTMLResponse(
+            content="""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta charset="UTF-8">
+                <title>Connection Failed</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; text-align: center; margin: 20px;">
+                    <div style="width: 80px; height: 80px; background: #fee; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">❌</div>
+                    <h1 style="color: #333; margin: 0 0 15px 0; font-size: 24px; font-weight: 600;">Connection Failed</h1>
+                    <p style="color: #666; margin: 0 0 0 0; font-size: 16px; line-height: 1.5;">Unable to retrieve access token from Spotify.</p>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=400,
         )
 
     # Get Spotify user info
@@ -125,15 +165,48 @@ async def spotify_callback(
     try:
         spotify_user = sp.current_user()
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get Spotify user info: {str(e)}",
+        return HTMLResponse(
+            content=f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta charset="UTF-8">
+                <title>Connection Failed</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; text-align: center; margin: 20px;">
+                    <div style="width: 80px; height: 80px; background: #fee; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">❌</div>
+                    <h1 style="color: #333; margin: 0 0 15px 0; font-size: 24px; font-weight: 600;">Connection Failed</h1>
+                    <p style="color: #666; margin: 0 0 25px 0; font-size: 16px; line-height: 1.5;">Unable to retrieve your Spotify profile. Please try again.</p>
+                    <p style="color: #999; font-size: 14px; margin: 0; padding: 15px; background: #f8f9fa; border-radius: 10px;">Error: {str(e)}</p>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=500,
         )
 
     if not spotify_user or "id" not in spotify_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get Spotify user info",
+        return HTMLResponse(
+            content="""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta charset="UTF-8">
+                <title>Connection Failed</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; text-align: center; margin: 20px;">
+                    <div style="width: 80px; height: 80px; background: #fee; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">❌</div>
+                    <h1 style="color: #333; margin: 0 0 15px 0; font-size: 24px; font-weight: 600;">Connection Failed</h1>
+                    <p style="color: #666; margin: 0 0 0 0; font-size: 16px; line-height: 1.5;">Unable to retrieve your Spotify profile information.</p>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=500,
         )
 
     expires_at = datetime.now(timezone.utc) + timedelta(
@@ -150,18 +223,77 @@ async def spotify_callback(
     result = supabase.table("users").update(update_data).eq("id", state).execute()
 
     if not result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+        return HTMLResponse(
+            content="""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta charset="UTF-8">
+                <title>Connection Failed</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+                <div style="background: white; padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; text-align: center; margin: 20px;">
+                    <div style="width: 80px; height: 80px; background: #fee; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">❌</div>
+                    <h1 style="color: #333; margin: 0 0 15px 0; font-size: 24px; font-weight: 600;">Connection Failed</h1>
+                    <p style="color: #666; margin: 0 0 0 0; font-size: 16px; line-height: 1.5;">User account not found. Please sign in again.</p>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=404,
         )
 
-    # Return JSON response for mobile app
-    return {
-        "success": True,
-        "message": "Spotify account connected successfully",
-        "spotify_user_id": spotify_user["id"],
-        "spotify_display_name": spotify_user.get("display_name"),
-    }
+    # Return success HTML page
+    return HTMLResponse(
+        content="""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta charset="UTF-8">
+            <title>Spotify Connected</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; text-align: center; margin: 20px; animation: slideUp 0.5s ease;">
+                <div style="width: 80px; height: 80px; background: #e8f5e9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">✓</div>
+                <h1 style="color: #1DB954; margin: 0 0 15px 0; font-size: 28px; font-weight: 700;">Connected!</h1>
+                <p style="color: #666; margin: 0 0 25px 0; font-size: 16px; line-height: 1.5;">Your Spotify account has been successfully connected to AUX.</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                    <p style="color: #999; font-size: 14px; margin: 0;">You can now close this window and return to the app.</p>
+                </div>
+            </div>
+            <style>
+                @keyframes slideUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(30px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                button:hover {
+                    background: #1ed760;
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(29, 185, 84, 0.4);
+                }
+                button:active {
+                    transform: translateY(0);
+                }
+            </style>
+            <script>
+                // Auto-close window after 3 seconds
+                setTimeout(function() {
+                    window.close();
+                }, 3000);
+            </script>
+        </body>
+        </html>
+        """,
+        status_code=200,
+    )
 
 
 @router.delete("/disconnect", response_model=SpotifyConnectionStatus)
