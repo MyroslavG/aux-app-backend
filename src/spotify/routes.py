@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 
 import spotipy
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -31,8 +31,10 @@ def get_spotify_oauth() -> SpotifyOAuth:
     )
 
 
-def get_user_spotify_client(user: dict) -> spotipy.Spotify:
-    """Get Spotify client for a user with valid tokens."""
+def get_user_spotify_client(
+    user: dict, supabase: Optional[Client] = None
+) -> spotipy.Spotify:
+    """Get Spotify client for a user with valid tokens, auto-refreshing if needed."""
     if not user.get("spotify_access_token"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Spotify not connected"
@@ -43,19 +45,51 @@ def get_user_spotify_client(user: dict) -> spotipy.Spotify:
     if expires_at:
         expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
-        if expires_at <= now:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Spotify token expired, please reconnect",
-            )
 
-    token_info = {
-        "access_token": user["spotify_access_token"],
-        "refresh_token": user["spotify_refresh_token"],
-        "expires_at": int(expires_at.timestamp()) if expires_at else 0,
-    }
+        # If token is expired or will expire in the next 5 minutes, refresh it
+        if expires_at <= now + timedelta(minutes=5):
+            if not user.get("spotify_refresh_token"):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Spotify token expired and no refresh token available, please reconnect",
+                )
 
-    return spotipy.Spotify(auth=token_info["access_token"])
+            # Refresh the token
+            sp_oauth = get_spotify_oauth()
+            try:
+                token_info = sp_oauth.refresh_access_token(
+                    user["spotify_refresh_token"]
+                )
+
+                # Update user with new tokens
+                new_expires_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=token_info["expires_in"]
+                )
+
+                update_data = {
+                    "spotify_access_token": token_info["access_token"],
+                    "spotify_refresh_token": token_info["refresh_token"],
+                    "spotify_token_expires_at": new_expires_at.isoformat(),
+                }
+
+                # Update in database if supabase client is provided
+                if supabase:
+                    supabase.table("users").update(update_data).eq(
+                        "id", user["id"]
+                    ).execute()
+
+                # Update the user dict for this request
+                user["spotify_access_token"] = token_info["access_token"]
+                user["spotify_refresh_token"] = token_info["refresh_token"]
+                user["spotify_token_expires_at"] = new_expires_at.isoformat()
+
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Failed to refresh Spotify token: {str(e)}. Please reconnect.",
+                )
+
+    return spotipy.Spotify(auth=user["spotify_access_token"])
 
 
 @router.get("/connect", response_model=SpotifyAuthResponse)
@@ -76,42 +110,30 @@ async def spotify_callback(
     supabase: Client = Depends(get_supabase_client),
 ):
     """Handle Spotify OAuth callback and save tokens."""
-    from fastapi.responses import HTMLResponse
-
     sp_oauth = get_spotify_oauth()
 
     try:
         token_info = sp_oauth.get_access_token(code, check_cache=False)
     except Exception as e:
-        return HTMLResponse(
-            content=f"""
-            <html>
-                <body>
-                    <h1>Spotify Connection Failed</h1>
-                    <p>Error: {str(e)}</p>
-                    <p>You can close this window.</p>
-                </body>
-            </html>
-            """,
-            status_code=400,
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to get access token: {str(e)}",
         )
 
     # Get Spotify user info
     sp = spotipy.Spotify(auth=token_info["access_token"])
-    spotify_user = sp.current_user()
+    try:
+        spotify_user = sp.current_user()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get Spotify user info: {str(e)}",
+        )
 
     if not spotify_user or "id" not in spotify_user:
-        return HTMLResponse(
-            content="""
-            <html>
-                <body>
-                    <h1>Spotify Connection Failed</h1>
-                    <p>Failed to get Spotify user info</p>
-                    <p>You can close this window.</p>
-                </body>
-            </html>
-            """,
-            status_code=500,
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get Spotify user info",
         )
 
     expires_at = datetime.now(timezone.utc) + timedelta(
@@ -125,49 +147,21 @@ async def spotify_callback(
         "spotify_token_expires_at": expires_at.isoformat(),
     }
 
-    supabase.table("users").update(update_data).eq("id", state).execute()
+    result = supabase.table("users").update(update_data).eq("id", state).execute()
 
-    # Return success page
-    return HTMLResponse(
-        content="""
-        <html>
-            <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
-            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-                        text-align: center;
-                        padding: 50px 20px;
-                        background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
-                        margin: 0;
-                        min-height: 100vh;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;">
-                <div style="background: white;
-                           padding: 40px;
-                           border-radius: 20px;
-                           box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                           max-width: 400px;">
-                    <div style="font-size: 64px; margin-bottom: 20px;">✓</div>
-                    <h1 style="color: #1DB954; margin: 0 0 10px 0; font-size: 24px;">Spotify Connected!</h1>
-                    <p style="color: #666; margin: 0 0 30px 0; font-size: 16px;">
-                        Your Spotify account has been successfully connected.
-                    </p>
-                    <p style="color: #999; font-size: 14px; margin: 0;">
-                        You can close this window and return to the AUX app.
-                    </p>
-                </div>
-                <script>
-                    // Try to close the window after 2 seconds
-                    setTimeout(() => {
-                        window.close();
-                    }, 2000);
-                </script>
-            </body>
-        </html>
-        """,
-        status_code=200,
-    )
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Return JSON response for mobile app
+    return {
+        "success": True,
+        "message": "Spotify account connected successfully",
+        "spotify_user_id": spotify_user["id"],
+        "spotify_display_name": spotify_user.get("display_name"),
+    }
 
 
 @router.delete("/disconnect", response_model=SpotifyConnectionStatus)
@@ -200,9 +194,10 @@ async def search_tracks(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, ge=1, le=50),
     current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
 ):
     """Search for tracks on Spotify."""
-    sp_client = get_user_spotify_client(current_user)
+    sp_client = get_user_spotify_client(current_user, supabase)
 
     try:
         results = sp_client.search(q=q, type="track", limit=limit)
@@ -244,9 +239,13 @@ async def search_tracks(
 
 
 @router.get("/track/{track_id}", response_model=SpotifyTrack)
-async def get_track(track_id: str, current_user: dict = Depends(get_current_user)):
+async def get_track(
+    track_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
+):
     """Get track details by ID."""
-    sp_client = get_user_spotify_client(current_user)
+    sp_client = get_user_spotify_client(current_user, supabase)
 
     try:
         item = sp_client.track(track_id)
@@ -283,10 +282,12 @@ async def get_track(track_id: str, current_user: dict = Depends(get_current_user
 
 @router.get("/playlists", response_model=List[SpotifyPlaylist])
 async def get_user_playlists(
-    limit: int = Query(20, ge=1, le=50), current_user: dict = Depends(get_current_user)
+    limit: int = Query(20, ge=1, le=50),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
 ):
     """Get user's Spotify playlists."""
-    sp_client = get_user_spotify_client(current_user)
+    sp_client = get_user_spotify_client(current_user, supabase)
 
     try:
         results = sp_client.current_user_playlists(limit=limit)
@@ -316,9 +317,12 @@ async def get_user_playlists(
 
 
 @router.get("/currently-playing", response_model=CurrentlyPlaying)
-async def get_currently_playing(current_user: dict = Depends(get_current_user)):
+async def get_currently_playing(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
+):
     """Get user's currently playing track."""
-    sp_client = get_user_spotify_client(current_user)
+    sp_client = get_user_spotify_client(current_user, supabase)
 
     try:
         current = sp_client.current_playback()
@@ -369,12 +373,13 @@ async def get_top_tracks(
         "medium_term", regex="^(short_term|medium_term|long_term)$"
     ),
     current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
 ):
     """
     Get user's top tracks.
     time_range: short_term (4 weeks), medium_term (6 months), long_term (years)
     """
-    sp_client = get_user_spotify_client(current_user)
+    sp_client = get_user_spotify_client(current_user, supabase)
 
     try:
         results = sp_client.current_user_top_tracks(limit=limit, time_range=time_range)
