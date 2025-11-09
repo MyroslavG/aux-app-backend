@@ -7,6 +7,8 @@ from supabase._sync.client import SyncClient as Client
 from config.settings import settings
 from src.middleware.auth import (
     create_access_token,
+    create_refresh_token,
+    decode_token,
     get_current_user,
     get_supabase_client,
 )
@@ -18,8 +20,13 @@ class GoogleSignInRequest(BaseModel):
     id_token: str
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 class AuthResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
     user: dict
 
@@ -82,10 +89,16 @@ async def google_sign_in(
             user = user_response.data[0]
             print(f"New user created: {user['username']}")
 
-        # Create JWT token
+        # Create JWT tokens
         access_token = create_access_token(data={"sub": str(user["id"])})
+        refresh_token = create_refresh_token(data={"sub": str(user["id"])})
 
-        return AuthResponse(access_token=access_token, token_type="bearer", user=user)
+        return AuthResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            user=user,
+        )
 
     except ValueError as e:
         print(f"Token verification failed: {str(e)}")
@@ -103,6 +116,58 @@ async def google_sign_in(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Authentication failed: {str(e)}",
+        )
+
+
+@router.post("/refresh", response_model=AuthResponse)
+async def refresh_access_token(
+    request: RefreshTokenRequest, supabase: Client = Depends(get_supabase_client)
+):
+    """Refresh access token using refresh token."""
+    try:
+        # Decode and validate refresh token
+        payload = decode_token(request.refresh_token)
+
+        # Check if it's a refresh token
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type. Must be a refresh token.",
+            )
+
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+
+        # Fetch user from database
+        user_response = supabase.table("users").select("*").eq("id", user_id).execute()
+
+        if not user_response.data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+            )
+
+        user = user_response.data[0]
+
+        # Create new access token (refresh token stays the same)
+        new_access_token = create_access_token(data={"sub": str(user["id"])})
+
+        return AuthResponse(
+            access_token=new_access_token,
+            refresh_token=request.refresh_token,  # Return the same refresh token
+            token_type="bearer",
+            user=user,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid refresh token: {str(e)}",
         )
 
 

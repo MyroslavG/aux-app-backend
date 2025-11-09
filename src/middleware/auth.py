@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Security, status
@@ -20,17 +20,28 @@ def get_supabase_client() -> Client:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token."""
-    from datetime import timezone
     to_encode = data.copy()
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
     else:
-        expire = now + timedelta(
-            minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expire = now + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode.update({"exp": expire, "iat": now})
+    to_encode.update({"exp": expire, "iat": now, "type": "access"})
+    encoded_jwt = jwt.encode(
+        to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
+    return encoded_jwt
+
+
+def create_refresh_token(data: dict) -> str:
+    """Create a JWT refresh token with longer expiration."""
+    to_encode = data.copy()
+    now = datetime.now(timezone.utc)
+    # Refresh tokens last 90 days
+    expire = now + timedelta(days=90)
+
+    to_encode.update({"exp": expire, "iat": now, "type": "refresh"})
     encoded_jwt = jwt.encode(
         to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
     )

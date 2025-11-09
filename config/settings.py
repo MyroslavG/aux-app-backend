@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 days
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour (matches Google's token expiration)
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
