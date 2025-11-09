@@ -4,6 +4,15 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
+class NotificationActor(BaseModel):
+    """The user who triggered the notification."""
+
+    id: str
+    username: str
+    display_name: str
+    profile_image_url: Optional[str] = None
+
+
 class NotificationResponse(BaseModel):
     id: str
     user_id: str
@@ -13,6 +22,7 @@ class NotificationResponse(BaseModel):
     data: Optional[dict[str, Any]] = None
     is_read: bool
     created_at: datetime
+    actor: Optional[NotificationActor] = None  # The user who triggered the notification
 
     class Config:
         from_attributes = True

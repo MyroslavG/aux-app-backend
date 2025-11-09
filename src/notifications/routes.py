@@ -5,9 +5,40 @@ from supabase._sync.client import SyncClient as Client
 
 from src.middleware import get_current_user, get_supabase_client
 
-from .schemas import MarkAsReadRequest, NotificationResponse, UnreadCountResponse
+from .schemas import (
+    MarkAsReadRequest,
+    NotificationActor,
+    NotificationResponse,
+    UnreadCountResponse,
+)
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
+
+
+def enrich_notification_with_actor(
+    notification: dict, supabase: Client
+) -> NotificationResponse:
+    """Enrich notification with current actor data."""
+    actor = None
+
+    # If notification has an actor_id in data, fetch current user info
+    if notification.get("data") and notification["data"].get("follower_id"):
+        actor_id = notification["data"]["follower_id"]
+        try:
+            actor_result = (
+                supabase.table("users")
+                .select("id, username, display_name, profile_image_url")
+                .eq("id", actor_id)
+                .single()
+                .execute()
+            )
+            if actor_result.data:
+                actor = NotificationActor(**actor_result.data)
+        except Exception:
+            # If user not found, actor stays None
+            pass
+
+    return NotificationResponse(**notification, actor=actor)
 
 
 @router.get("", response_model=List[NotificationResponse])
@@ -32,7 +63,13 @@ async def get_notifications(
 
     result = query.execute()
 
-    return [NotificationResponse(**notification) for notification in result.data]
+    # Enrich each notification with current actor data
+    enriched_notifications = [
+        enrich_notification_with_actor(notification, supabase)
+        for notification in result.data
+    ]
+
+    return enriched_notifications
 
 
 @router.get("/unread-count", response_model=UnreadCountResponse)

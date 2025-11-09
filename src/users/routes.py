@@ -233,6 +233,7 @@ async def follow_user(
     ).execute()
 
     # Create notification for the followed user
+    # Store only follower_id - we'll fetch current username/display_name when displaying
     supabase.table("notifications").insert(
         {
             "user_id": target_user_id,
@@ -241,9 +242,6 @@ async def follow_user(
             "body": f"{current_user['username']} started following you",
             "data": {
                 "follower_id": current_user["id"],
-                "follower_username": current_user["username"],
-                "follower_display_name": current_user.get("display_name", current_user["username"]),
-                "follower_profile_image_url": current_user.get("profile_image_url"),
             },
         }
     ).execute()
