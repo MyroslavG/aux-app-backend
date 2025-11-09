@@ -151,6 +151,22 @@ async def update_profile(
             status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update"
         )
 
+    # If username is being updated, check if it's already taken
+    if "username" in update_dict:
+        # Check if username is already taken by another user
+        existing_user = (
+            supabase.table("users")
+            .select("id")
+            .eq("username", update_dict["username"])
+            .execute()
+        )
+
+        if existing_user.data and existing_user.data[0]["id"] != current_user["id"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username is already taken",
+            )
+
     # Update user
     updated_user = (
         supabase.table("users")
