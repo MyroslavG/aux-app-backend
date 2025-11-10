@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from supabase._sync.client import SyncClient as Client
 
 from src.middleware import (
@@ -12,6 +13,13 @@ from src.middleware import (
 from .schemas import CreatePostRequest, PostAuthor, PostResponse, UpdatePostRequest
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
+
+
+class ExpirationCheckResponse(BaseModel):
+    """Response for expiration check endpoint."""
+
+    expired_count: int
+    message: str
 
 
 def format_post_with_user(post: dict, supabase: Client) -> PostResponse:
@@ -97,20 +105,22 @@ async def get_feed(
         following_ids = [f["following_id"] for f in following.data]
         following_ids.append(current_user_id)  # Include own posts
 
-        # Get posts from followed users
+        # Get posts from followed users (exclude expired)
         posts = (
             supabase.table("posts")
             .select("*")
             .in_("user_id", following_ids)
+            .eq("is_expired", False)
             .order("created_at", desc=True)
             .range(offset, offset + limit - 1)
             .execute()
         )
     else:
-        # Get recent posts
+        # Get recent posts (exclude expired)
         posts = (
             supabase.table("posts")
             .select("*")
+            .eq("is_expired", False)
             .order("created_at", desc=True)
             .range(offset, offset + limit - 1)
             .execute()
@@ -129,11 +139,19 @@ async def get_post(
     supabase: Client = Depends(get_supabase_client),
 ):
     """Get a specific post by ID."""
-    post = supabase.table("posts").select("*").eq("id", post_id).single().execute()
+    post = (
+        supabase.table("posts")
+        .select("*")
+        .eq("id", post_id)
+        .eq("is_expired", False)
+        .single()
+        .execute()
+    )
 
     if not post.data:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found or has expired",
         )
 
     return format_post_with_user(post.data, supabase)
@@ -228,11 +246,12 @@ async def get_user_posts(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    # Get user's posts
+    # Get user's posts (exclude expired)
     posts = (
         supabase.table("posts")
         .select("*")
         .eq("user_id", user.data["id"])
+        .eq("is_expired", False)
         .order("created_at", desc=True)
         .range(offset, offset + limit - 1)
         .execute()
